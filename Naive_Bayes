@@ -1,0 +1,162 @@
+#Lucas Debner da Silva 
+#Naive Bayes vs. KNN
+# =============================================================================
+# 0) Upload do arquivo CSV
+# =============================================================================
+import pandas as pd
+import numpy as np
+
+try:
+    from google.colab import files
+    print("Selecione o arquivo insurance.csv para upload...")
+    uploaded = files.upload()
+    print("Arquivos enviados:", uploaded.keys())
+except:
+    print("Google Colab não detectado — certifique-se de que o arquivo está na mesma pasta.")
+
+# Detectar automaticamente o arquivo CSV enviado
+csv_files = [f for f in uploaded.keys() if f.endswith('.csv')]
+
+if len(csv_files) == 0:
+    raise ValueError("Nenhum arquivo .csv enviado. Envie o arquivo insurance.csv!")
+
+csv_name = csv_files[0]
+print("Carregando arquivo:", csv_name)
+
+df_data = pd.read_csv(csv_name)
+print("Arquivo carregado com sucesso!")
+print(df_data.head())
+
+# =============================================================================
+# Imports dos modelos e métricas
+# =============================================================================
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import accuracy_score, f1_score
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
+# =============================================================================
+# ETAPA 1 — Processamento dos dados
+# =============================================================================
+
+# Converter variáveis categóricas para numéricas
+df_data = pd.get_dummies(df_data)
+
+# Nome da coluna alvo
+labels = df_data["charges"].values
+
+# Features = todas as colunas menos o alvo
+data = df_data.drop("charges", axis=1).values
+
+# Escalonamento (muito importante pro KNN)
+scaler = StandardScaler()
+data = scaler.fit_transform(data)
+
+# Discretização das classes (charges → 3 faixas)
+quantiles = np.quantile(labels, [0.33, 0.66])
+labels_cat = np.digitize(labels, quantiles)
+
+print("Classes após discretização:", np.unique(labels_cat, return_counts=True))
+
+# Histograma para visualizar o alvo
+plt.hist(labels, bins=30)
+plt.title("Distribuição dos valores de charges")
+plt.show()
+
+# =============================================================================
+# ETAPA 2 — Treino e avaliação (Naive Bayes e KNN)
+# =============================================================================
+
+skf = StratifiedKFold(n_splits=10, random_state=42, shuffle=True)
+
+# ---- Naive Bayes
+L_acc_nb = []
+L_f1_nb = []
+L_f1_macro_nb = []
+
+# ---- KNN
+L_acc_knn = []
+L_f1_knn = []
+L_f1_macro_knn = []
+
+for train_index, test_index in skf.split(data, labels_cat):
+    
+    data_train, data_test = data[train_index], data[test_index]
+    labels_train, labels_test = labels_cat[train_index], labels_cat[test_index]
+
+    # ------ Naive Bayes ------
+    clf_nb = GaussianNB()
+    clf_nb.fit(data_train, labels_train)
+    y_pred_nb = clf_nb.predict(data_test)
+
+    L_acc_nb.append(accuracy_score(labels_test, y_pred_nb))
+    L_f1_nb.append(f1_score(labels_test, y_pred_nb, average='weighted'))
+    L_f1_macro_nb.append(f1_score(labels_test, y_pred_nb, average='macro'))
+
+    # ------ KNN ------
+    clf_knn = KNeighborsClassifier(n_neighbors=15)
+    clf_knn.fit(data_train, labels_train)
+    y_pred_knn = clf_knn.predict(data_test)
+
+    L_acc_knn.append(accuracy_score(labels_test, y_pred_knn))
+    L_f1_knn.append(f1_score(labels_test, y_pred_knn, average='weighted'))
+    L_f1_macro_knn.append(f1_score(labels_test, y_pred_knn, average='macro'))
+
+
+# =============================================================================
+# ETAPA 3 — Resultados
+# =============================================================================
+print("\n======= RESULTADOS =======")
+print('Acurácia Naive Bayes:', np.mean(L_acc_nb))
+print('F1 Score Naive Bayes:', np.mean(L_f1_nb))
+print('F1 Score Macro Naive Bayes:', np.mean(L_f1_macro_nb))
+print('Parâmetros do Naive Bayes:', clf_nb.get_params())
+print('-------')
+print('Acurácia KNN:', np.mean(L_acc_knn))
+print('F1 Score KNN:', np.mean(L_f1_knn))
+print('F1 Score Macro KNN:', np.mean(L_f1_macro_knn))
+print('Parâmetros do KNN:', clf_knn.get_params())
+print('===========================\n')
+
+# =============================================================================
+# ETAPA 4 — Visualização das métricas
+# =============================================================================
+
+metrics = {
+    'Acurácia': [np.mean(L_acc_nb), np.mean(L_acc_knn)],
+    'F1 Score': [np.mean(L_f1_nb), np.mean(L_f1_knn)],
+    'F1 Score Macro': [np.mean(L_f1_macro_nb), np.mean(L_f1_macro_knn)]
+}
+
+labels_plot = ['Naive Bayes', 'KNN']
+x = np.arange(len(labels_plot))
+width = 0.25
+
+fig, ax = plt.subplots()
+rects1 = ax.bar(x - width, metrics['Acurácia'], width, label='Acurácia')
+rects2 = ax.bar(x, metrics['F1 Score'], width, label='F1 Score')
+rects3 = ax.bar(x + width, metrics['F1 Score Macro'], width, label='F1 Score Macro')
+
+ax.set_ylabel('Pontuações')
+ax.set_title('Comparação entre Classificadores')
+ax.set_xticks(x)
+ax.set_xticklabels(labels_plot)
+ax.legend()
+
+def autolabel(rects):
+    for rect in rects:
+        height = rect.get_height()
+        ax.annotate(f'{height:.2f}',
+                    xy=(rect.get_x() + rect.get_width()/2, height),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+
+autolabel(rects1)
+autolabel(rects2)
+autolabel(rects3)
+
+fig.tight_layout()
+plt.show()
