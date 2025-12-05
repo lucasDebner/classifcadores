@@ -83,7 +83,7 @@ print(f"MSE: {mse:.2f}")
 print(f"R²: {r2:.3f}")
 
 # ============================================================
-# Gráficos de perda e MAE (estilo professor)
+# Gráficos de perda e MAE
 # ============================================================
 
 plt.figure(figsize=(12,5))
@@ -150,4 +150,3 @@ def desenhar_rede(modelo):
     plt.show()
 
 desenhar_rede(modelo)
-
