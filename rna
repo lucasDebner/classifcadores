@@ -1,1 +1,153 @@
+# Lucas Debner da Silva
+"""
+Rede Neural – insurance.csv – Prática de Análise de classificadores
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from google.colab import files
+import io
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.optimizers import Adam
+
+# ============================================================
+# Upload do arquivo
+# ============================================================
+
+uploaded = files.upload()
+filename = list(uploaded.keys())[0]
+df = pd.read_csv(io.BytesIO(uploaded[filename]))
+print("\nArquivo carregado:", filename)
+print(df.head())
+
+# ============================================================
+# Pré-processamento
+# ============================================================
+
+y = df["charges"]
+X = df.drop("charges", axis=1)
+
+X = pd.get_dummies(X, drop_first=True)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.3, random_state=42
+)
+input_dim = X_train.shape[1]
+
+# ============================================================
+# Criação do modelo
+# ============================================================
+
+def criar_modelo(num_camadas_ocultas=2, num_neuronios=20, taxa_aprendizado=0.01):
+    modelo = Sequential()
+    modelo.add(Dense(num_neuronios, input_dim=input_dim, activation='relu'))
+    for _ in range(num_camadas_ocultas-1):
+        modelo.add(Dense(num_neuronios, activation='relu'))
+    modelo.add(Dense(1, activation='linear'))  # saída contínua
+    otimizador = Adam(learning_rate=taxa_aprendizado)
+    modelo.compile(loss='mse', optimizer=otimizador, metrics=['mae'])
+    return modelo
+
+modelo = criar_modelo()
+
+# ============================================================
+# Treinamento
+# ============================================================
+
+historico = modelo.fit(
+    X_train, y_train,
+    epochs=200,
+    batch_size=10,
+    verbose=0
+)
+
+# ============================================================
+# Avaliação
+# ============================================================
+
+y_pred = modelo.predict(X_test).flatten()
+
+from sklearn.metrics import mean_squared_error, r2_score
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+print("\n=========== Resultados ===========")
+print(f"MSE: {mse:.2f}")
+print(f"R²: {r2:.3f}")
+
+# ============================================================
+# Gráficos de perda e MAE (estilo professor)
+# ============================================================
+
+plt.figure(figsize=(12,5))
+
+plt.subplot(1,2,1)
+plt.plot(historico.history['loss'], label='Perda de Treinamento')
+plt.title('Perda durante o Treinamento')
+plt.xlabel('Épocas')
+plt.ylabel('MSE')
+plt.legend()
+
+plt.subplot(1,2,2)
+plt.plot(historico.history['mae'], label='Erro Absoluto Médio (MAE)')
+plt.title('MAE durante o Treinamento')
+plt.xlabel('Épocas')
+plt.ylabel('MAE')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# Visualização dos pesos da rede
+# ============================================================
+
+def visualizar_pesos(modelo):
+    for i, camada in enumerate(modelo.layers):
+        pesos = camada.get_weights()
+        if len(pesos) > 0:
+            plt.figure(figsize=(10, 4))
+            plt.title(f"Pesos da Camada {i + 1}")
+            im = plt.imshow(pesos[0], aspect='auto', cmap='viridis')
+            plt.colorbar(im)
+            plt.xlabel('Neurônios da camada anterior')
+            plt.ylabel('Neurônios da camada atual')
+
+            # Adiciona os valores numéricos dos pesos
+            for (j, k), valor in np.ndenumerate(pesos[0]):
+                plt.text(k, j, f'{valor:.2f}', ha='center', va='center', color='white', fontsize=8)
+
+            plt.show()
+
+visualizar_pesos(modelo)
+
+# ============================================================
+# Desenho da arquitetura da rede
+# ============================================================
+
+def desenhar_rede(modelo):
+    plt.figure(figsize=(8,6))
+    plt.title("Arquitetura da Rede Neural")
+    plt.axis('off')
+
+    # Entrada
+    plt.text(0, 0.5, f'Entrada\n({input_dim} atributos)', fontsize=12, ha='center')
+
+    # Camadas ocultas
+    for i, layer in enumerate(modelo.layers[:-1]):
+        plt.text(0.5, 0.5 - i*0.2, f'Camada Oculta {i+1}\n({layer.units} neurônios)', fontsize=12, ha='center')
+
+    # Saída
+    plt.text(1, 0.5 - (len(modelo.layers)-1)*0.2, 'Saída\n(1 valor contínuo)', fontsize=12, ha='center')
+
+    plt.show()
+
+desenhar_rede(modelo)
 
