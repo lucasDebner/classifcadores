@@ -1,0 +1,104 @@
+# -*- coding: utf-8 -*-
+"""
+Lucas Debner da Silva
+Disciplina: Fundamentos/Introdução a IA
+
+Práticas da aula de Aprendizado de Máquinas
+
+Objetivo: Construir, avaliar e visualizar um classificador linear SVM com 2 características
+
+"""
+
+# Importando bibliotecas necessárias
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score
+from google.colab import files
+
+# ----------------------------------------------------------
+# Carregar arquivo
+# ----------------------------------------------------------
+print("Selecione o arquivo insurance.csv")
+files.upload()
+
+df = pd.read_csv("insurance.csv")
+print("Primeiras linhas do dataset:")
+display(df.head())
+
+# ----------------------------------------------------------
+# Criar rótulo binário (alto custo vs baixo custo)
+# ----------------------------------------------------------
+threshold = df["charges"].median()     # você pode trocar para .quantile(0.75)
+df["classe"] = (df["charges"] > threshold).astype(int)
+
+# ----------------------------------------------------------
+# Selecionar apenas 2 FEATURES NUMÉRICAS para o gráfico 2D
+# ----------------------------------------------------------
+X = df[["age", "bmi"]].values    # <-- aqui adaptamos do Iris para Insurance
+y = df["classe"].values          # rótulo binário
+
+# ----------------------------------------------------------
+# Divisão dos dados em treino e teste (70/30)
+# ----------------------------------------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+# ----------------------------------------------------------
+# Treinar o SVM (kernel linear)
+# ----------------------------------------------------------
+svm_classifier = SVC(kernel='linear', random_state=42)
+svm_classifier.fit(X_train, y_train)
+
+# ----------------------------------------------------------
+# Previsões
+# ----------------------------------------------------------
+y_pred = svm_classifier.predict(X_test)
+
+# ----------------------------------------------------------
+# Avaliação
+# ----------------------------------------------------------
+accuracy = accuracy_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+conf_matrix = confusion_matrix(y_test, y_pred)
+class_report = classification_report(y_test, y_pred)
+
+print(f"Acurácia: {accuracy:.2f}")
+print(f"Métrica F1: {f1:.2f}")
+print("Matriz de Confusão:\n", conf_matrix)
+print("Relatório de Classificação:\n", class_report)
+
+# ----------------------------------------------------------
+# Visualização 2D
+# ----------------------------------------------------------
+plt.figure(figsize=(10, 6))
+
+# Plotando os pontos de treino
+plt.scatter(X_train[y_train == 0, 0], X_train[y_train == 0, 1],
+            color='blue', label='Baixo custo (classe 0)')
+plt.scatter(X_train[y_train == 1, 0], X_train[y_train == 1, 1],
+            color='red', label='Alto custo (classe 1)')
+
+# Criando grade para a fronteira de decisão
+x_min, x_max = X[:, 0].min() - 2, X[:, 0].max() + 2
+y_min, y_max = X[:, 1].min() - 2, X[:, 1].max() + 2
+
+xx, yy = np.meshgrid(
+    np.arange(x_min, x_max, 0.1),
+    np.arange(y_min, y_max, 0.1)
+)
+
+Z = svm_classifier.predict(np.c_[xx.ravel(), yy.ravel()])
+Z = Z.reshape(xx.shape)
+
+# Fronteira de decisão
+plt.contourf(xx, yy, Z, alpha=0.3)
+
+plt.xlabel("Idade (age)")
+plt.ylabel("Índice de Massa Corporal (BMI)")
+plt.title("Classificador SVM Linear - Insurance Dataset (2D)")
+plt.legend()
+plt.show()
